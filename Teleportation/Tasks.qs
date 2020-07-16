@@ -7,7 +7,8 @@ namespace Quantum.Kata.Teleportation {
     open Microsoft.Quantum.Canon;
     open Microsoft.Quantum.Convert;
     open Microsoft.Quantum.Math;
-    
+    open Microsoft.Quantum.Preparation;
+    open Microsoft.Quantum.Diagnostics;
     
     //////////////////////////////////////////////////////////////////
     // Welcome!
@@ -44,7 +45,8 @@ namespace Quantum.Kata.Teleportation {
     // In the context of the quantum teleportation protocol, this is the preparation step:
     // qubits qAlice and qBob will be sent to Alice and Bob, respectively.
     operation Entangle (qAlice : Qubit, qBob : Qubit) : Unit {
-        // ...
+        H(qAlice);
+        CNOT(qAlice, qBob);
     }
     
     
@@ -61,8 +63,11 @@ namespace Quantum.Kata.Teleportation {
     //      Represent measurement result 'One' as 'true' and 'Zero' as 'false'.
     // The state of the qubits in the end of the operation doesn't matter.
     operation SendMessage (qAlice : Qubit, qMessage : Qubit) : (Bool, Bool) {
-        // ...
-        return (false, false);
+        CNOT(qMessage, qAlice);
+        H(qMessage);
+        let resAlice = M(qAlice);
+        let resMessage = M(qMessage);
+        return (resMessage == One, resAlice == One);
     }
     
     
@@ -75,7 +80,18 @@ namespace Quantum.Kata.Teleportation {
     //         in the format used in task 1.2.
     // Goal: transform Bob's qubit qBob into the state in which the message qubit had been originally.
     operation ReconstructMessage (qBob : Qubit, (b1 : Bool, b2 : Bool)) : Unit {
-        // ...
+        if(b1 and b2){
+            X(qBob);
+            Z(qBob);
+        }
+        if(b1 and not b2){
+            Z(qBob);
+        }
+        if(not b1 and b2){
+            X(qBob);
+        }
+        if(not b1 and not b2){
+        }
     }
     
     
@@ -88,7 +104,25 @@ namespace Quantum.Kata.Teleportation {
     // Goal: transform Bob's qubit qBob into the state |ψ⟩.
     // The state of the qubits qAlice and qMessage in the end of the operation doesn't matter.
     operation StandardTeleport (qAlice : Qubit, qBob : Qubit, qMessage : Qubit) : Unit {
-        // ...
+        H(qAlice);
+        CNOT(qAlice, qBob);
+        CNOT(qMessage, qAlice);
+        H(qMessage);
+        let b1 = M(qMessage) == One;
+        let b2 = M(qAlice) == One;
+        
+        if(b1 and b2){
+            X(qBob);
+            Z(qBob);
+        }
+        if(b1 and not b2){
+            Z(qBob);
+        }
+        if(not b1 and b2){
+            X(qBob);
+        }
+        if(not b1 and not b2){
+        }
     }
     
     
@@ -109,8 +143,16 @@ namespace Quantum.Kata.Teleportation {
     //      Represent measurement result 'One' as 'true' and 'Zero' as 'false'.
     // The state of the qubit qAlice in the end of the operation doesn't matter.
     operation PrepareAndSendMessage (qAlice : Qubit, basis : Pauli, state : Bool) : (Bool, Bool) {
-        // ...
-        return (false, false);
+        using(ancillary = Qubit()){
+            if(state == true){
+                X(ancillary);
+            }
+
+            PrepareQubit(basis, ancillary);
+            let res = SendMessage(qAlice, ancillary);
+            Reset(ancillary);
+            return res;
+        }
     }
     
     
@@ -130,9 +172,8 @@ namespace Quantum.Kata.Teleportation {
     // in which the message qubit was originally prepared, then measure it. 
     // The state of the qubit qBob in the end of the operation doesn't matter.
     operation ReconstructAndMeasureMessage (qBob : Qubit, (b1 : Bool, b2 : Bool), basis : Pauli) : Bool {
-        
-        // ...
-        return false;
+        ReconstructMessage(qBob, (b1, b2));
+        return Measure([basis], [qBob]) == One;
     }
     
     
@@ -148,7 +189,57 @@ namespace Quantum.Kata.Teleportation {
 
         // StandardTeleport_Test appears in the list of unit tests for the solution; run it to verify your code.
 
-        // ...
+        using(qBob = Qubit()){
+            using(qAlice = Qubit()){
+                using(qMessage = Qubit()){
+                    StandardTeleport(qAlice, qBob, qMessage);
+                    EqualityFactB(M(qBob) == Zero, true, "Wrong Answer");
+
+                    Reset(qAlice); Reset(qBob); Reset(qMessage);
+
+                    X(qMessage);
+                    StandardTeleport(qAlice, qBob, qMessage);
+                    EqualityFactB(M(qBob) == One, true, "Wrong Answer");
+
+                    Reset(qAlice); Reset(qBob); Reset(qMessage);
+
+                    H(qMessage);
+                    StandardTeleport(qAlice, qBob, qMessage);
+                    H(qBob);
+                    EqualityFactB(M(qBob) == Zero, true, "Wrong Answer");
+                    
+                    Reset(qAlice); Reset(qBob); Reset(qMessage);
+
+                    X(qMessage);
+                    H(qMessage);
+                    StandardTeleport(qAlice, qBob, qMessage);
+                    H(qBob);
+                    EqualityFactB(M(qBob) == One, true, "Wrong Answer");
+                    
+                    Reset(qAlice); Reset(qBob); Reset(qMessage);
+
+                    H(qMessage);
+                    S(qMessage);
+                    StandardTeleport(qAlice, qBob, qMessage);
+                    S(qBob);
+                    Z(qBob);
+                    H(qBob);
+                    EqualityFactB(M(qBob) == Zero, true, "Wrong Answer");
+                    
+                    Reset(qAlice); Reset(qBob); Reset(qMessage);
+
+                    H(qMessage);
+                    S(qMessage);
+                    Z(qMessage);
+                    StandardTeleport(qAlice, qBob, qMessage);
+                    S(qBob);
+                    H(qBob);
+                    EqualityFactB(M(qBob) == Zero, true, "Wrong Answer");
+                    
+                    Reset(qAlice); Reset(qBob); Reset(qMessage);
+                }
+            }
+        }
     }
     
     
@@ -170,19 +261,55 @@ namespace Quantum.Kata.Teleportation {
     
     // Task 2.1. Reconstruct the message if the entangled qubits were in the state |Φ⁻⟩ = (|00⟩ - |11⟩) / sqrt(2).
     operation ReconstructMessage_PhiMinus (qBob : Qubit, (b1 : Bool, b2 : Bool)) : Unit {
-        // ...
+        if(b1 and b2){
+            // optional
+            //Rz(2.0 * Microsoft.Quantum.Math.PI(), qBob);
+            X(qBob);
+        }
+        if(b1 and not b2){
+
+        }
+        if(not b1 and b2){
+            Z(qBob);
+            X(qBob);
+        }
+        if(not b1 and not b2){
+            Z(qBob);
+        }
     }
     
     
     // Task 2.2. Reconstruct the message if the entangled qubits were in the state |Ψ⁺⟩ = (|01⟩ + |10⟩) / sqrt(2).
     operation ReconstructMessage_PsiPlus (qBob : Qubit, (b1 : Bool, b2 : Bool)) : Unit {
-        // ...
+        if(not b1 and not b2){
+            X(qBob);
+        }
+        if(not b1 and b2){
+
+        }
+        if(b1 and not b2){
+            X(qBob);
+            Z(qBob);
+        }
+        if(b1 and b2){
+            Z(qBob);
+        }
     }
     
     
     // Task 2.3. Reconstruct the message if the entangled qubits were in the state |Ψ⁻⟩ = (|01⟩ - |10⟩) / sqrt(2).
     operation ReconstructMessage_PsiMinus (qBob : Qubit, (b1 : Bool, b2 : Bool)) : Unit {
-        // ...
+        if(not b1 and not b2){
+            X(qBob);
+            Z(qBob);
+        }
+        if(not b1 and b2){
+            Z(qBob);
+        }
+        if(b1 and not b2){
+            X(qBob);
+        }
+        // optional global phase shifts too for |01> and |11>
     }
     
     
@@ -204,7 +331,11 @@ namespace Quantum.Kata.Teleportation {
     // Goal: transform Bob's qubit qBob into the state |ψ⟩ using no measurements.
     // At the end of the operation qubits qAlice and qMessage should not be entangled with qBob.
     operation MeasurementFreeTeleport (qAlice : Qubit, qBob : Qubit, qMessage : Qubit) : Unit {
-        // ...
+        CNOT(qMessage, qAlice);
+        H(qMessage);
+
+        CNOT(qAlice, qBob);
+        Controlled Z([qMessage], qBob);
     }
     
     
@@ -224,7 +355,11 @@ namespace Quantum.Kata.Teleportation {
     // In the context of the quantum teleportation protocol, this is the preparation step:
     // qubits qAlice, qBob, and qCharlie will be sent to Alice, Bob, and Charlie respectively.
     operation EntangleThreeQubits (qAlice : Qubit, qBob : Qubit, qCharlie : Qubit) : Unit {
-        // ...
+        H(qAlice);
+        H(qBob);
+
+        CNOT(qAlice, qCharlie);
+        CNOT(qBob, qCharlie);
     }
     
     
@@ -243,7 +378,15 @@ namespace Quantum.Kata.Teleportation {
     //      3) A classical bit resulting from the measurement of Bob's qubit.
     // Goal: transform Charlie's qubit qCharlie into the state in which the message qubit had been originally.
     operation ReconstructMessageWhenThreeEntangledQubits (qCharlie : Qubit, (b1 : Bool, b2 : Bool), b3 : Bool) : Unit {
-        // ...
+        if(b1){
+            Z(qCharlie);
+        }
+        if(b2){
+            X(qCharlie);
+        }
+        if(b3){
+            X(qCharlie);
+        }
     }
     
 }

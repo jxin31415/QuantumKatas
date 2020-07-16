@@ -58,7 +58,7 @@ namespace Quantum.Kata.DeutschJozsaAlgorithm {
         // Since f(x) = 1 for all values of x, |y ⊕ f(x)⟩ = |y ⊕ 1⟩ = |NOT y⟩.
         // This means that the operation needs to flip qubit y (i.e. transform |0⟩ to |1⟩ and vice versa).
 
-        // ...
+        X(y);
     }
     
     
@@ -73,7 +73,7 @@ namespace Quantum.Kata.DeutschJozsaAlgorithm {
         // You don't need to modify it. Feel free to remove it, this won't cause your code to fail.
         EqualityFactB(0 <= k and k < Length(x), true, "k should be between 0 and N-1, inclusive");
 
-        // ...
+        CNOT(x[k], y);
     }
     
     
@@ -85,7 +85,9 @@ namespace Quantum.Kata.DeutschJozsaAlgorithm {
     operation Oracle_OddNumberOfOnes (x : Qubit[], y : Qubit) : Unit {
         // Hint: f(x) can be represented as x_0 ⊕ x_1 ⊕ ... ⊕ x_(N-1)
 
-        // ...
+        for(i in 0..Length(x)-1){
+            CNOT(x[i], y);
+        }
     }
     
     
@@ -103,7 +105,11 @@ namespace Quantum.Kata.DeutschJozsaAlgorithm {
         // You don't need to modify it. Feel free to remove it, this won't cause your code to fail.
         EqualityFactI(Length(x), Length(r), "Arrays should have the same length");
 
-        // ...
+        for(i in 0..Length(x)-1){
+            if(r[i] == 1){
+                CNOT(x[i], y);
+            }
+        }
     }
     
     
@@ -119,7 +125,14 @@ namespace Quantum.Kata.DeutschJozsaAlgorithm {
         // You don't need to modify it. Feel free to remove it, this won't cause your code to fail.
         EqualityFactI(Length(x), Length(r), "Arrays should have the same length");
 
-        // ...
+        for(i in 0..Length(x)-1){
+            if(r[i] == 1){
+                CNOT(x[i], y);
+            }
+            if(r[i] == 0){
+                (ControlledOnInt(0, X))([x[i]], y);
+            }
+        }
     }
     
     
@@ -140,12 +153,19 @@ namespace Quantum.Kata.DeutschJozsaAlgorithm {
 
         // Hint: the first part of the function is the same as in task 1.4
 
-        // ...
+        Oracle_OddNumberOfOnes(x, y);
 
         // Hint: you can use Controlled functor to perform multicontrolled gates
         // (gates with multiple control qubits).
-
-        // ...
+        
+        mutable prefixBool = new Bool[P];
+        for(i in 0..P-1){
+            if(prefix[i] == 1){
+                set prefixBool w/= i <- true;
+            }
+        }
+        
+        (ControlledOnBitString(prefixBool, X))(x[0..P-1], y);
     }
     
     
@@ -161,7 +181,9 @@ namespace Quantum.Kata.DeutschJozsaAlgorithm {
 
         // Hint: represent f(x) in terms of AND and ⊕ operations
 
-        // ...
+        CCNOT(x[0], x[1], y);
+        CCNOT(x[1], x[2], y);
+        CCNOT(x[0], x[2], y);
     }
     
     
@@ -179,7 +201,12 @@ namespace Quantum.Kata.DeutschJozsaAlgorithm {
     //      2) create |-⟩ state (|-⟩ = (|0⟩ - |1⟩) / sqrt(2)) on answer register
     operation BV_StatePrep (query : Qubit[], answer : Qubit) : Unit
     is Adj {
-            // ...
+            for(i in query){
+                H(i);
+            }
+
+            X(answer);
+            H(answer);
     }
     
     
@@ -203,7 +230,20 @@ namespace Quantum.Kata.DeutschJozsaAlgorithm {
         // the variable has to be mutable to allow updating it.
         mutable r = new Int[N];
         
-        // ...
+        using(qs = Qubit[N]){
+            using(ancilla = Qubit()){
+                BV_StatePrep(qs, ancilla);
+                Uf(qs, ancilla);
+                ApplyToEach(H, qs);
+                for(i in 0..Length(qs)-1){
+                    if(M(qs[i]) == One){
+                        set r w/= i <- 1;
+                    }
+                }
+                ResetAll(qs);
+                Reset(ancilla);
+            }
+        }
 
         return r;
     }
@@ -228,7 +268,10 @@ namespace Quantum.Kata.DeutschJozsaAlgorithm {
 
         // BV_Test appears in the list of unit tests for the solution; run it to verify your code.
 
-        // ...
+        let bit_vector = [0, 1, 1, 0, 1, 0, 0];
+
+        let oracle = Oracle_ProductFunction(_, _, bit_vector);
+        AllEqualityFactI(bit_vector, BV_Algorithm(Length(bit_vector), oracle), "FAILURE");
     }
     
     
@@ -262,7 +305,13 @@ namespace Quantum.Kata.DeutschJozsaAlgorithm {
         // it can be expressed as running Bernstein-Vazirani algorithm
         // and then post-processing the return value classically.
         
-        // ...
+        let r = BV_Algorithm(N, Uf);
+
+        for(b in r){
+            if(b == 1){
+                set isConstantFunction = false;
+            }
+        }
 
         return isConstantFunction;
     }
@@ -278,8 +327,23 @@ namespace Quantum.Kata.DeutschJozsaAlgorithm {
         // Hint: use the Fact function to assert that the return value of DJ_Algorithm operation matches the expected value
 
         // DJ_Test appears in the list of unit tests for the solution; run it to verify your code.
+        mutable oracle = Oracle_Zero(_, _);
+        mutable N = 5;
 
-        // ...
+        EqualityFactB(DJ_Algorithm(N, oracle), true, "Wrong Answer");
+
+        set oracle = Oracle_One(_, _);
+
+        EqualityFactB(DJ_Algorithm(N, oracle), true, "Wrong Answer");
+
+        let kthQubitTest = 3;
+        set oracle = Oracle_Kth_Qubit(_, _, kthQubitTest);
+
+        EqualityFactB(DJ_Algorithm(N, oracle), false, "Wrong Answer");
+
+        set oracle = Oracle_OddNumberOfOnes(_, _);
+
+        EqualityFactB(DJ_Algorithm(N, oracle), false, "Wrong Answer");
     }
     
     
@@ -305,8 +369,31 @@ namespace Quantum.Kata.DeutschJozsaAlgorithm {
         // Declare an Int array in which the result will be stored;
         // the variable has to be mutable to allow updating it.
         mutable r = new Int[N];
-        
-        // ...
+
+        using(qs = Qubit[N]){
+            using(ancilla = Qubit()){
+                Uf(qs, ancilla); 
+                let res = M(ancilla); // returns 1 if there is an odd number of zeroes, 0 if there is an even number
+
+                // If there is an odd number of zeroes
+                if(res == One){
+                    // Make sure that r has an odd number of zeroes
+                    if(N % 2 == 0){
+                        set r w/= 0 <- 1;
+                    }
+
+                // Even number of zeroes
+                } else {
+                    if(N % 2 == 1){
+                        set r w/= 0 <- 1;
+                    }
+                }
+                ResetAll(qs);
+                Reset(ancilla);
+            }
+        }
+
+
         return r;
     }
     

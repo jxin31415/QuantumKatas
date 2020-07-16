@@ -46,8 +46,8 @@ namespace Quantum.Kata.SuperdenseCoding {
     // Input: Two qubits, each in the |0⟩ state.
     // Goal:  Create a Bell state |Φ⁺⟩ = (|00⟩ + |11⟩) / sqrt(2) on these qubits.
     operation CreateEntangledPair (q1 : Qubit, q2 : Qubit) : Unit is Adj {
-
-        // ...
+        H(q1);
+        CNOT(q1, q2);
     }
     
     
@@ -68,9 +68,11 @@ namespace Quantum.Kata.SuperdenseCoding {
         // [1; 1]:    |Ψ⁻⟩ = (|01⟩ - |10⟩) / sqrt(2)
 
         if (message::Bit1) { // accesses the item 'Bit1' of 'message'
-            // ...
+            Z(qAlice);
         }
-        // ...
+        if(message::Bit2){
+            X(qAlice);
+        }
     }
     
     
@@ -83,8 +85,24 @@ namespace Quantum.Kata.SuperdenseCoding {
     // The state of the qubits in the end of the operation should be |00⟩.
     // You can create an instance of ProtocolMessage as ProtocolMessage(bit1value, bit2value).
     operation DecodeMessageFromQubits (qAlice : Qubit, qBob : Qubit) : ProtocolMessage {
+        CNOT(qAlice, qBob);
+        H(qAlice);
 
-        fail ("Task 3 not implemented");
+        let res1 = M(qAlice);
+        let res2 = M(qBob);
+        Reset(qAlice);
+        Reset(qBob);
+
+        if(res1 == One and res2 == One){
+            return ProtocolMessage(true, true);
+        }
+        if(res1 == One and res2 == Zero){
+            return ProtocolMessage(true, false);
+        }
+        if(res1 == Zero and res2 == One){
+            return ProtocolMessage(false, true);
+        }
+        return ProtocolMessage(false, false);
     }
     
     
@@ -96,8 +114,30 @@ namespace Quantum.Kata.SuperdenseCoding {
     // and decode the two classical bits from the state of the pair.
     // Return the result of decoding. 
     operation SuperdenseCodingProtocol (message : ProtocolMessage) : ProtocolMessage {
-                
-        fail ("Task 4 not implemented");
+        mutable b1 = false; mutable b2 = false;
+        using(qAlice = Qubit()){
+            using(qBob = Qubit()){
+                H(qAlice);
+                CNOT(qAlice, qBob);
+
+                if(message::Bit1){
+                    Z(qAlice);
+                }
+                if(message::Bit2){
+                    X(qAlice);
+                }
+
+                CNOT(qAlice, qBob);
+                H(qAlice);
+
+                set b1 = M(qAlice) == One;
+                set b2 = M(qBob) == One;
+
+                Reset(qBob);
+            }
+            Reset(qAlice);
+        }
+        return ProtocolMessage(b1, b2);
     }
     
 }
