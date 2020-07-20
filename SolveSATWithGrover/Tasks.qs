@@ -49,7 +49,7 @@ namespace Quantum.Kata.GroversAlgorithm {
     // Stretch goal: Can you implement the oracle so that it would work
     //               for queryRegister containing an arbitrary number of qubits?
     operation Oracle_And (queryRegister : Qubit[], target : Qubit) : Unit is Adj {        
-        // ...
+        Controlled X(queryRegister, target);
     }
 
 
@@ -64,7 +64,9 @@ namespace Quantum.Kata.GroversAlgorithm {
     // Stretch goal: Can you implement the oracle so that it would work
     //               for queryRegister containing an arbitrary number of qubits?
     operation Oracle_Or (queryRegister : Qubit[], target : Qubit) : Unit is Adj {        
-        // ...
+        (ControlledOnInt(0, X))(queryRegister, target);
+
+        X(target);
     }
 
 
@@ -79,7 +81,8 @@ namespace Quantum.Kata.GroversAlgorithm {
     // Stretch goal: Can you implement the oracle so that it would work
     //               for queryRegister containing an arbitrary number of qubits?
     operation Oracle_Xor (queryRegister : Qubit[], target : Qubit) : Unit is Adj {        
-        // ...
+        Oracle_Or(queryRegister, target);
+        Oracle_And(queryRegister, target);
     }
 
 
@@ -95,7 +98,17 @@ namespace Quantum.Kata.GroversAlgorithm {
     // It is possible (and quite straightforward) to implement this oracle based on this observation; 
     // however, for the purposes of learning to write oracles to solve SAT problems we recommend using the representation above.
     operation Oracle_AlternatingBits (queryRegister : Qubit[], target : Qubit) : Unit is Adj {        
-        // ...
+        using(register = Qubit[Length(queryRegister) - 1]){
+            for(i in 0..Length(register)-1){
+                Oracle_Xor([queryRegister[i], queryRegister[i+1]], register[i]);
+            }
+
+            Oracle_And(register, target);
+
+            for(i in 0..Length(register)-1){
+                Adjoint Oracle_Xor([queryRegister[i], queryRegister[i+1]], register[i]);
+            }
+        }
     }
 
 
@@ -122,8 +135,31 @@ namespace Quantum.Kata.GroversAlgorithm {
     // The clause clause(x) = x₀ ∨ ¬x₁ can be represented as [(0, true), (1, false)].
     operation Oracle_SATClause (queryRegister : Qubit[], 
                                 target : Qubit, 
-                                clause : (Int, Bool)[]) : Unit is Adj {        
-        // ...
+                                clause : (Int, Bool)[]) : Unit is Adj { 
+        for(tup in clause){
+            let (ind, negate) = tup;
+            if(not negate){
+                X(queryRegister[ind]);
+            }
+        }
+
+        Oracle_Or(SATClause_Helper(queryRegister, clause), target);
+
+        for(tup in clause){
+            let (ind, negate) = tup;
+            if(not negate){
+                X(queryRegister[ind]);
+            }
+        }
+    }
+
+    function SATClause_Helper(queryRegister: Qubit[], clause: (Int, Bool)[]) : Qubit[] {
+        mutable arr = new Qubit[Length(clause)];       
+        for(i in 0..Length(clause)-1){
+            let (ind, negate) = clause[i];
+            set arr w/= i <- queryRegister[ind];
+        }
+        return arr;
     }
 
 
@@ -152,7 +188,16 @@ namespace Quantum.Kata.GroversAlgorithm {
     operation Oracle_SAT (queryRegister : Qubit[], 
                           target : Qubit, 
                           problem : (Int, Bool)[][]) : Unit is Adj {        
-        // ...
+        using(clauseReg = Qubit[Length(problem)]){
+            for(i in 0.. Length(problem)-1){
+                Oracle_SATClause(queryRegister, clauseReg[i], problem[i]);
+            }
+            Oracle_And(clauseReg, target);
+
+            for(i in 0.. Length(problem)-1){
+                Oracle_SATClause(queryRegister, clauseReg[i], problem[i]);
+            }
+        }
     }
 
 
