@@ -278,7 +278,7 @@ namespace Quantum.Kata.GroversAlgorithm {
     operation GroversAlgorithm_Loop (register : Qubit[], oracle : ((Qubit[], Qubit) => Unit is Adj), iterations : Int) : Unit {
         let phaseOracle = OracleConverter_Reference(oracle);
         ApplyToEach(H, register);
-            
+        
         for (i in 1 .. iterations) {
             phaseOracle(register);
             ApplyToEach(H, register);

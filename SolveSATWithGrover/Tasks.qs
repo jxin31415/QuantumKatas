@@ -8,6 +8,7 @@ namespace Quantum.Kata.GroversAlgorithm {
     open Microsoft.Quantum.Diagnostics;
     open Microsoft.Quantum.Convert;
     open Microsoft.Quantum.Math;
+    open Microsoft.Quantum.Measurement;
     
     
     //////////////////////////////////////////////////////////////////
@@ -48,7 +49,7 @@ namespace Quantum.Kata.GroversAlgorithm {
     //       Leave the query register in the same state it started in.
     // Stretch goal: Can you implement the oracle so that it would work
     //               for queryRegister containing an arbitrary number of qubits?
-    operation Oracle_And (queryRegister : Qubit[], target : Qubit) : Unit is Adj {        
+    operation Oracle_And (queryRegister : Qubit[], target : Qubit) : Unit is Adj + Ctl {        
         Controlled X(queryRegister, target);
     }
 
@@ -63,7 +64,7 @@ namespace Quantum.Kata.GroversAlgorithm {
     //       Leave the query register in the same state it started in.
     // Stretch goal: Can you implement the oracle so that it would work
     //               for queryRegister containing an arbitrary number of qubits?
-    operation Oracle_Or (queryRegister : Qubit[], target : Qubit) : Unit is Adj {        
+    operation Oracle_Or (queryRegister : Qubit[], target : Qubit) : Unit is Adj + Ctl {        
         (ControlledOnInt(0, X))(queryRegister, target);
 
         X(target);
@@ -135,7 +136,7 @@ namespace Quantum.Kata.GroversAlgorithm {
     // The clause clause(x) = x₀ ∨ ¬x₁ can be represented as [(0, true), (1, false)].
     operation Oracle_SATClause (queryRegister : Qubit[], 
                                 target : Qubit, 
-                                clause : (Int, Bool)[]) : Unit is Adj { 
+                                clause : (Int, Bool)[]) : Unit is Adj + Ctl { 
         for(tup in clause){
             let (ind, negate) = tup;
             if(not negate){
@@ -187,7 +188,7 @@ namespace Quantum.Kata.GroversAlgorithm {
     //       Leave the query register in the same state it started in.
     operation Oracle_SAT (queryRegister : Qubit[], 
                           target : Qubit, 
-                          problem : (Int, Bool)[][]) : Unit is Adj {        
+                          problem : (Int, Bool)[][]) : Unit is Adj + Ctl {        
         using(clauseReg = Qubit[Length(problem)]){
             for(i in 0.. Length(problem)-1){
                 Oracle_SATClause(queryRegister, clauseReg[i], problem[i]);
@@ -221,7 +222,10 @@ namespace Quantum.Kata.GroversAlgorithm {
     // Stretch goal: Can you implement the oracle so that it would work
     //               for queryRegister containing an arbitrary number of qubits?
     operation Oracle_Exactly1One (queryRegister : Qubit[], target : Qubit) : Unit is Adj {
-        // ...
+        mutable bitstring = new Bool[Length(queryRegister)];
+        for(i in 0..Length(bitstring)-1){
+            (ControlledOnBitString(bitstring w/ i <- true, X))(queryRegister, target);
+        }
     }
 
 
@@ -245,7 +249,47 @@ namespace Quantum.Kata.GroversAlgorithm {
                                     target : Qubit, 
                                     problem : (Int, Bool)[][]) : Unit is Adj {        
         // Hint: can you reuse parts of the code in section 1?
-        // ...
+        // Description unclear: basically, apply the oracle normally, but only one bit is allowed to be on in each clause
+        using(clauseReg = Qubit[Length(problem)]){
+            for(i in 0.. Length(problem)-1){
+                Oracle1_3SAT_Clause(queryRegister, clauseReg[i], problem[i]);
+            }
+
+            Oracle_And(clauseReg, target);
+
+            for(i in 0.. Length(problem)-1){
+                Oracle1_3SAT_Clause(queryRegister, clauseReg[i], problem[i]);
+            }
+        }
+    }
+
+    operation Oracle1_3SAT_Clause (queryRegister : Qubit[], 
+                                target : Qubit, 
+                                clause : (Int, Bool)[]) : Unit is Adj { 
+        for(tup in clause){
+            let (ind, negate) = tup;
+            if(not negate){
+                X(queryRegister[ind]);
+            }
+        }
+
+        Oracle_Exactly1One(SATClause_Helper(queryRegister, clause), target);
+
+        for(tup in clause){
+            let (ind, negate) = tup;
+            if(not negate){
+                X(queryRegister[ind]);
+            }
+        }
+    }
+
+    function Oracle1_3SAT_Clause_Helper(queryRegister: Qubit[], clause: (Int, Bool)[]) : Qubit[] {
+        mutable arr = new Qubit[Length(clause)];       
+        for(i in 0..Length(clause)-1){
+            let (ind, negate) = clause[i];
+            set arr w/= i <- queryRegister[ind];
+        }
+        return arr;
     }
 
 
@@ -267,7 +311,8 @@ namespace Quantum.Kata.GroversAlgorithm {
         // - the alternating bits oracle from task 1.4 has exactly two solutions,
         // - the OR oracle from task 1.2 for 2 qubits has exactly 3 solutions, and so on.
 
-        // ...
+        AllEqualityFactB(UniversalGroversAlgorithm(5, Oracle_And), [true, true, true, true, true], "Incorrect Answer for AND Oracle");
+        
     }
     
 
@@ -284,7 +329,45 @@ namespace Quantum.Kata.GroversAlgorithm {
     // (the number that minimized the probability of such failure). 
     // In this task you also need to make your implementation robust to not knowing the optimal number of iterations.
     operation UniversalGroversAlgorithm (N : Int, oracle : ((Qubit[], Qubit) => Unit is Adj)) : Bool[] {
-        // ...
-        return new Bool[N];
+        mutable arr = new Bool[N];
+
+        mutable iter = 1;
+        mutable success = false;
+        using(register = Qubit[N]){
+            using(target = Qubit()){
+                repeat {
+                    Message($"Trying search with {iter} iterations");
+                    X(target);
+                    H(target);
+                    ApplyToEach(H, register);
+                    for(i in 1..iter){
+                        oracle(register, target);
+                        ApplyToEach(H, register);
+                        (ControlledOnBitString(new Bool[Length(register)], X))(register, target);
+                        ApplyToEach(H, register);
+                    }
+                    
+                    let res = MultiM(register);
+
+                    H(target);
+                    X(target);
+
+                    oracle(register, target);
+                    if(M(target) == One){
+                        set success = true;
+                        set arr = ResultArrayAsBoolArray(res);
+                    }
+                    Reset(target);
+                    ResetAll(register);
+                    set iter *= 2;
+                } until(success or iter > 200);
+            }
+        }
+    
+        //if (not success) {
+        //    fail "Failed to find an answer";
+        //}
+        Message($"{arr}");
+        return arr;
     }
 }
