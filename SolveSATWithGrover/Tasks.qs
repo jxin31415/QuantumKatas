@@ -364,9 +364,9 @@ namespace Quantum.Kata.GroversAlgorithm {
             }
         }
     
-        //if (not success) {
-        //    fail "Failed to find an answer";
-        //}
+        if (not success) {
+           fail "Failed to find an answer";
+        }
         Message($"{arr}");
         return arr;
     }

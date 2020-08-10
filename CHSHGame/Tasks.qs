@@ -38,8 +38,7 @@ namespace Quantum.Kata.CHSHGame {
     //     True if Alice and Bob won the CHSH game, that is, if X ∧ Y = A ⊕ B,
     //     and false otherwise.
     function WinCondition (x : Bool, y : Bool, a : Bool, b : Bool) : Bool {
-        // ...
-        fail "Task 1.1 not implemented yet";
+        return (x and y) == ((a or b) and not (a and b));
     }
 
 
@@ -50,15 +49,13 @@ namespace Quantum.Kata.CHSHGame {
     // Input: Alice's starting bit (X).
     // Output: The bit that Alice should output (A) to maximize their chance of winning.
     operation AliceClassical (x : Bool) : Bool {
-        // ...
-        fail "Alice's strategy in task 1.2 not implemented yet";
+        return false;
     }
 
     // Input: Bob's starting bit (Y).
     // Output: The bit that Bob should output (B) to maximize their chance of winning.
     operation BobClassical (y : Bool) : Bool {
-        // ...
-        fail "Bob's strategy in task 1.2 not implemented yet";
+        return false;
     }
 
 
@@ -78,8 +75,8 @@ namespace Quantum.Kata.CHSHGame {
         // You don't need to modify them. Feel free to remove them, this won't cause your code to fail.
         EqualityFactI(Length(qs), 2, "The array should have exactly 2 qubits.");
 
-        // ...
-        fail "Task 2.1 not implemented yet";
+        H(qs[0]);
+        CNOT(qs[0], qs[1]);
     }
 
 
@@ -91,8 +88,11 @@ namespace Quantum.Kata.CHSHGame {
     //        or the X basis if her bit is 1 (true), and return the result.
     // The state of the qubit after the operation does not matter.
     operation AliceQuantum (bit : Bool, qubit : Qubit) : Bool {
-        // ...
-        fail "Task 2.2 not implemented yet";
+        if(bit){
+            return Measure([PauliX], [qubit]) == One;
+        } else {
+            return Measure([PauliZ], [qubit]) == One;
+        }
     }
 
 
@@ -103,8 +103,11 @@ namespace Quantum.Kata.CHSHGame {
     // Goal:  Rotate the qubit π/8 radians around the Y axis in the given direction.
     operation RotateBobQubit (clockwise : Bool, qubit : Qubit) : Unit {
         // Hint: Ry operation applies a rotation by a given angle in counterclockwise direction.
-        // ...
-        fail "Task 2.3 not implemented yet";
+        if(clockwise){
+            Ry(-PI() / 4.0, qubit);
+        } else {
+            Ry(PI() / 4.0, qubit);
+        }
     }
 
 
@@ -116,8 +119,8 @@ namespace Quantum.Kata.CHSHGame {
     //        or the -π/8 basis if his bit is 1 (true), and return the result.
     // The state of the qubit after the operation does not matter.
     operation BobQuantum (bit : Bool, qubit : Qubit) : Bool {
-        // ...
-        fail "Task 2.4 not implemented yet";
+        RotateBobQubit(not bit, qubit);
+        return M(qubit) == One;
     }
 
 
@@ -131,8 +134,16 @@ namespace Quantum.Kata.CHSHGame {
     // which you've implemented in tasks 2.2 and 2.4, respectively.
     operation PlayQuantumCHSH (askAlice : (Qubit => Bool), askBob : (Qubit => Bool))
             : (Bool, Bool) {
-        // ...
-        fail "Task 2.5 not implemented yet";
+        mutable (one, two) = (false, false);
+        using(q = Qubit[2]){
+            CreateEntangledPair(q);
+            set one = askAlice(q[0]);
+            set two = askBob(q[1]);
+
+            ResetAll(q);
+        }
+
+        return (one, two);
     }
 
 }
